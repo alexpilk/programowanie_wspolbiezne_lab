@@ -7,7 +7,13 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-char output_file[] = "wynik.bin";
+char OUTPUT_FILE_NAME[] = "wynik.bin";
+
+struct Report {
+    int from;
+    int to;
+    int count;
+};
 
 int main(int argc, char *argv[]){
 
@@ -37,22 +43,20 @@ int main(int argc, char *argv[]){
         printf("Thread %d returned %d \n", thread, result);
     }
 
+    struct Report report;
     int total = 0;
-    int buffer[threads];
-    int ptr = open(output_file, O_RDONLY);  // r for read, b for binary
-
-    read(ptr, buffer, sizeof(buffer)); // read 10 bytes to our buffer
-    close(ptr);
-    for (int i = 0; i < threads; i++) {
-        printf("%d\n", buffer[i]);
-        total += buffer[i];
+    int output_file = open(OUTPUT_FILE_NAME, O_RDONLY);
+    if(output_file < 0) {
+        perror("Could not open output file");
     }
+
+    for (int i = 0; i < threads; i++) {
+        int r = read(output_file, &report, sizeof(report));
+        printf("%d\n", report.count);
+        total += report.count;
+    }
+
+    close(output_file);
+
     printf("Total: %d\n", total);
-    // int total = 0;
-    // for (int thread = 0; thread < threads; thread++) {
-    //     int status;
-    //     wait(&status);
-    //     int result = WEXITSTATUS(status);
-    //     total += result;
-    //     printf("Thread %d returned %d, total = %d\n", thread, result, total);
 }

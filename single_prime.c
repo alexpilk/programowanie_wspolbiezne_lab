@@ -23,16 +23,25 @@ int is_prime(int number){
 }
 
 
+struct Report {
+    int from;
+    int to;
+    int count;
+};
+
+
 int main(int argc, char * argv[]) {
-    int from = atoi(argv[1]);
-    int to = atoi(argv[2]);
-    // int from = 1;
-    // int to = 100;
-    int count = 0;
+    // int from = atoi(argv[1]);
+    // int to = atoi(argv[2]);
+    struct Report report;
+
+    report.from = atoi(argv[1]);
+    report.to = atoi(argv[2]);
+    report.count = 0;
     
-    for (int i = from; i < to; i++) {
+    for (int i = report.from; i < report.to; i++) {
         if(is_prime(i)) {
-            count++;
+            report.count++;
         }
     }
 
@@ -50,15 +59,19 @@ int main(int argc, char * argv[]) {
     }
     // sleep(2);
     // printf("lock: %d\n", lock);
-    printf("Writing %d\n", count);
-    int wr = write(handle, &count, sizeof(int));
+    printf("Writing %d\n", report.count);
+    int wr = write(handle, &report, sizeof(report));
     if(wr < 0) {
         perror("write");
     }
     int release = lockf(handle, F_ULOCK, 0);
     // printf("lock released: %d\n", release);
     close(handle);
-    printf("od %d do %d liczb %d\n", from, to, count);
+    printf("od %d do %d liczb %d\n", report.from, report.to, report.count);
     
-
+    struct Report report2;
+    int reopen = open(output_file, O_RDONLY);
+    read(reopen, &report2, sizeof(report2));
+    printf("od %d do %d liczb %d\n", report2.from, report2.to, report2.count);
+    close(reopen);
 }
