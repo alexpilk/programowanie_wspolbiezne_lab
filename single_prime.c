@@ -23,6 +23,17 @@ int is_prime(int number){
 }
 
 
+int count_primes(int from, int to) {
+    int count = 0;
+    for (int i = from; i < to; i++) {
+        if(is_prime(i)) {
+            count++;
+        }
+    }
+    return count;
+}
+
+
 struct Report {
     int from;
     int to;
@@ -37,13 +48,7 @@ int main(int argc, char * argv[]) {
 
     report.from = atoi(argv[1]);
     report.to = atoi(argv[2]);
-    report.count = 0;
-    
-    for (int i = report.from; i < report.to; i++) {
-        if(is_prime(i)) {
-            report.count++;
-        }
-    }
+    report.count = count_primes(report.from, report.to);
 
     int handle = open(output_file, O_WRONLY | O_APPEND | O_CREAT, 0777);
     if(handle < 0) {
