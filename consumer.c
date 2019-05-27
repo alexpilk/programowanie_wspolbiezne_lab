@@ -1,30 +1,27 @@
-#include <stdlib.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <semaphore.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <mqueue.h>
 #include <unistd.h>
-
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "common.h"
 
-int main(int argc, char **argv)
-{
-    int bytes_read;
-    mqd_t mq;
-    mq = mq_open(QUEUE_NAME, O_RDONLY, 0644);
-    CHECK((mqd_t)-1 != mq);
+int main(int argc, char ** argv) {
+  bufor_t* wbuf = init_buff();
 
-    do {
-        ms_type msg;
-       
-        /* receive the message */
-        bytes_read = mq_receive(mq, (char *) &msg, sizeof(msg), NULL);
-        if(bytes_read < 0) perror("receive");
-        printf("Received: %d %s\n", msg.type, msg.text);
-        sleep(1);
-    } while (1);
+  for (int i = 0; i < 10; i++) {
+    sem_wait( & (wbuf -> full));
+    sem_wait( & (wbuf -> mutex));
+    printf("Konsument - cnt: %d odebrano %s\n", wbuf -> cnt, wbuf -> buf[wbuf -> tail]);
+    wbuf -> cnt--;
+    wbuf -> tail = (wbuf -> tail + 1) % BSIZE;
+    sem_post( & (wbuf -> mutex));
+    sem_post( & (wbuf -> empty));
+    sleep(1);
+  }
 
-    return 0;
+  sem_close( & (wbuf -> mutex));
+  sem_close( & (wbuf -> empty));
+  sem_close( & (wbuf -> full));
 }
