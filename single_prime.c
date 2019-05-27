@@ -5,9 +5,48 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/mman.h> 
+#include <semaphore.h> 
+
 
 char FIFO_NAME[] = "fifo";
 
+
+typedef struct {
+    int from;
+    int to;
+    int count;
+} Report;
+
+
+typedef struct { 
+    int wymiar; 
+    Report dane[4]; 
+} bufor_t;
+
+
+bufor_t* init_buff(){
+    int fd, size;
+    fd = shm_open("bufor", O_RDWR | O_CREAT, 0774);
+    if (fd == -1) {
+    perror("open");
+        exit(-1);
+    }
+    printf("fd: %d\n", fd);
+    // size = ftruncate(fd, sizeof(bufor_t));
+
+    // if (size < 0) {
+    // perror("trunc");
+    //     exit(-1);
+    // }
+
+    bufor_t* wbuf = (bufor_t * ) mmap(0, sizeof(bufor_t), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (wbuf == NULL) {
+        perror("map");
+        _exit(-1);
+    }
+    return wbuf;
+}
 
 int is_prime(int number){
     if (number == 1 || number == 0) {
@@ -34,39 +73,17 @@ int count_primes(int from, int to) {
 }
 
 
-struct Report {
-    int from;
-    int to;
-    int count;
-};
-
-
 int main(int argc, char * argv[]) {
-    struct Report report;
+    printf("Start %s\n", argv[3]);
+    bufor_t* buffer = init_buff();
+    printf("Buffer ready %s\n", argv[3]);
+    int index = atoi(argv[3]);
 
-    report.from = atoi(argv[1]);
-    report.to = atoi(argv[2]);
-    report.count = count_primes(report.from, report.to);
+    buffer->dane[index].from = atoi(argv[1]);
+    buffer->dane[index].to = atoi(argv[2]);
+    buffer->dane[index].count = count_primes(buffer->dane[index].from, buffer->dane[index].to);
 
-    int handle = open(FIFO_NAME, O_WRONLY | O_APPEND | O_CREAT, 0777);
-    if(handle < 0) {
-        perror("open");
-        return 0;
-    }
+    printf("Writing %d\n", buffer->dane[index].count);
 
-    int lock;
-    lock = lockf(handle, F_LOCK, 0);
-    if(lock < 0) {
-        perror("lockf");
-        return 0;
-    }
-
-    printf("Writing %d\n", report.count);
-    int wr = write(handle, &report, sizeof(report));
-    if(wr < 0) {
-        perror("write");
-    }
-    printf("od %d do %d liczb %d\n", report.from, report.to, report.count);
-    int release = lockf(handle, F_ULOCK, 0);
-    close(handle);
+    return 0;
 }

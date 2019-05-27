@@ -7,22 +7,56 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#include <sys/mman.h> 
+#include <semaphore.h> 
+
 char FIFO_NAME[] = "fifo";
 
-struct  {
+typedef struct {
     int from;
     int to;
     int count;
 } Report;
 
 
+typedef struct { 
+    int wymiar; 
+    Report dane[4]; 
+} bufor_t;
 
-int run_single_prime(int from, int to) {
+
+bufor_t* init_buff(){
+    int fd, size;
+    fd = shm_open("bufor", O_RDWR | O_CREAT, 0774);
+    if (fd == -1) {
+    perror("open");
+        exit(-1);
+    }
+    printf("fd: %d\n", fd);
+    size = ftruncate(fd, sizeof(bufor_t));
+
+    if (size < 0) {
+    perror("trunc");
+        exit(-1);
+    }
+
+    bufor_t* wbuf = (bufor_t * ) mmap(0, sizeof(bufor_t), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (wbuf == NULL) {
+        perror("map");
+        _exit(-1);
+    }
+    return wbuf;
+}
+
+
+int run_single_prime(int from, int to, int i) {
     char from_str[sizeof(int) * 4 + 1];
     char to_str[sizeof(int) * 4 + 1];
+    char index[sizeof(int) * 4 + 1];
     sprintf(from_str, "%d", from);
     sprintf(to_str, "%d", to);
-    return execl("./single_prime", "single_prime", from_str, to_str, (char *)0);
+    sprintf(index, "%d", i);
+    return execl("./single_prime", "single_prime", from_str, to_str, index, (char *)0);
 }
 
 int main(int argc, char *argv[]){
@@ -35,24 +69,18 @@ int main(int argc, char *argv[]){
     int increment = range/threads;
 
     int total = 0;
-    remove(FIFO_NAME);
-    if(mkfifo(FIFO_NAME, S_IRUSR | S_IWUSR) < 0) {   
-        perror("Pipe");
-        return 0; 
-    }
+
+
+    shm_unlink("bufor");
+    bufor_t* buffer = init_buff();
 
     for(int i = 0; i < threads; i++) {
 
         if(fork() == 0) {  // potomny --------------
             int from = FROM + i * increment;
             int to = from + increment;
-            return run_single_prime(from, to);
+            return run_single_prime(from, to, i);
     	} 
-    }
-  
-    int fifo = open(FIFO_NAME, O_RDWR);
-    if (fifo < 0) {
-        perror("Couldn't open FIFO");
     }
 
     for (int thread = 0; thread < threads; thread++) {
@@ -61,15 +89,14 @@ int main(int argc, char *argv[]){
         int result = WEXITSTATUS(status);
         printf("Thread %d returned %d \n", thread, result);
       
-        read(fifo, &Report, sizeof(Report));
-        printf("Od %d do %d liczb %d\n",Report.from,Report.to,Report.count); 
-        total += Report.count;
-        printf("Reported %d\n", Report.count);
+        // read(fifo, &Report, sizeof(Report));
+        Report* report = &buffer->dane[thread];
+        printf("Od %d do %d liczb %d\n",report->from,report->to,report->count); 
+        total += report->count;
+        printf("Reported %d\n", report->count);
     }
 
     printf("Total: %d\n", total);
 
-    close(fifo);
-    remove(FIFO_NAME);
     return total;    
 }
