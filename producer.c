@@ -4,89 +4,95 @@
 #include <unistd.h>
 #include <string.h>
 
-///////////
-#define SIZE 4 // Liczba pozycji (napisow) w buforze
-#define LSIZE 80 // Dlugosc napisu
-char buf[SIZE][LSIZE]; // Bufor na napisy
-int head = 0; // Tutaj wpisujemy do bufora nowy element
-int tail = 0; // Stad pobieramy element z bufora
-int cnt = 0; // Liczba elementow w buforze
-pthread_cond_t empty = PTHREAD_COND_INITIALIZER; // Tu czekamy gdy brak miejsca w buforze
-pthread_cond_t full = PTHREAD_COND_INITIALIZER; // Tu czekamy gdy brak rekordow w buforze
-pthread_mutex_t mutex; // Wzajemne wykluczanie
-////////////
+#define threads 4
+
+typedef struct {
+    int from;
+    int to;
+    int count;
+} Report;
+Report reports[threads];
+pthread_t id[4]; 
 
 int wynik;
 
-void* consume(void* arg)
-{
-    while (1) {
-        pthread_mutex_lock(&mutex);
 
-        while (cnt == 0) {
-            printf("Buffer empty\n");
-            pthread_cond_wait(&empty, &mutex);
-        }
-        printf("Consumed \n");
-        printf(buf[tail]);
-        if (tail == SIZE - 1) {
-            tail = 0;
-        }
-        else {
-            tail++;
-        }
-        cnt--;
-        pthread_cond_signal(&full);
-        pthread_mutex_unlock(&mutex);
-        sleep(rand() % 2);
+int is_prime(int number){
+    if (number == 1 || number == 0) {
+        return 0;
     }
-    pthread_exit((void*)&wynik);
+
+    for(int i = number - 1; i > 1; i--) {
+        if(number % i == 0) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 void* produce(void* arg)
 {
-    int i = 0;
-    while (1) {
-        pthread_mutex_lock(&mutex);
+    Report report = reports[(int) arg];
 
-        while (cnt == SIZE) {
-            printf("Buffer full\n");
-            pthread_cond_wait(&full, &mutex);
+  printf("prining %d to %d\n", report.from, report.to);
+    for (int i = report.from; i < report.to; i++) {
+        if(is_prime(i)) {
+            report.count++;
         }
-        printf("Produced\n");
-        sprintf(buf[head], "Producer %d, step %d\n", (int) arg, i);
-        if (head == SIZE - 1) {
-            head = 0;
-        }
-        else {
-            head++;
-        }
-        cnt++;
-        pthread_cond_signal(&empty);
-
-        pthread_mutex_unlock(&mutex);
-        i++;
-        sleep(rand() % 2);
     }
-    pthread_exit((void*)&wynik);
+    reports[(int) arg].count = report.count;
+  printf("got %d\n", report.count);
+    pthread_exit((void*)&report.count);
 }
 
 int main(int argc, char* argv[])
 {
-    pthread_t producer_1_id = 1;
-    pthread_t producer_2_id = 2;
-    pthread_t consumer_id = 3;
-    int i, status;
-    void** statp;
-    printf("HI");
+    int FROM = 0;
+    int TO = 5000;
+    int range = TO - FROM;
 
-    pthread_create(&producer_1_id, NULL, produce, (void*)(producer_1_id));
-    pthread_create(&producer_2_id, NULL, produce, (void*)(producer_2_id));
-    pthread_create(&consumer_id, NULL, consume, (void*)(consumer_id));
+    int increment = range/threads;
+    printf("gut");
 
-    pthread_join(producer_1_id, (void*)&statp);
-    pthread_join(producer_2_id, (void*)&statp);
-    pthread_join(consumer_id, (void*)&statp);
+
+    for(int i = 0; i < threads; i++) {
+      // pthread_t id = i;
+        reports[i].from = FROM + i * increment;
+        reports[i].to = reports[i].from + increment;
+        pthread_create(&id[i], NULL, produce, (void*)(i));
+    }
+
+    int total = 0;
+
+    for(int i = 0; i < threads; i++) {
+      // pthread_t id = i;
+        void** statp;
+        pthread_join(id[i], (void*)&statp);
+        // total += (int)*statp;
+    }
+
+    for(int i = 0; i < threads; i++) {
+        Report report = reports[i];     
+        total += report.count;
+
+    }
+    printf("%d\n", total);
+
+
+    // pthread_t producer_1_id = 1;
+    // pthread_t producer_2_id = 2;
+    // pthread_t consumer_id = 3;
+    // int i, status;
+    // void** statp;
+    // printf("HI");
+
+    // pthread_create(&producer_1_id, NULL, produce, (void*)(producer_1_id));
+    // pthread_create(&producer_2_id, NULL, produce, (void*)(producer_2_id));
+    // pthread_create(&consumer_id, NULL, consume, (void*)(consumer_id));
+
+    // pthread_join(producer_1_id, (void*)&statp);
+    // pthread_join(producer_2_id, (void*)&statp);
+    // pthread_join(consumer_id, (void*)&statp);
 
     return 0;
 }
